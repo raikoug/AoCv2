@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -48,7 +47,6 @@ def get_session_token() -> str:
     if not token:
         print(
             "Errore: variabile d'ambiente AOC_SESSION non impostata.\n"
-            "Imposta AOC_SESSION o crea un file .env con ad es.:\n"
             "AOC_SESSION=il_tuo_cookie_di_sessione_di_adventofcode",
             file=sys.stderr,
         )
