@@ -3,3 +3,4 @@ beautifulsoup4
 markdownify
 python-dotenv
 numpy
+pygame
