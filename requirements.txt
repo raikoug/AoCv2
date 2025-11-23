@@ -4,3 +4,5 @@ markdownify
 python-dotenv
 numpy
 pygame
+sympy
+networkx
