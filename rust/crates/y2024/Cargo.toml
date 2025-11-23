@@ -1,0 +1,12 @@
+[package]
+name = "y2024"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aoclib = { path = "../aoclib" }
+
+# Possiamo definire esplicitamente i bin, ma non è strettamente necessario:
+[[bin]]
+name = "day_01"
+path = "src/bin/day_01.rs"

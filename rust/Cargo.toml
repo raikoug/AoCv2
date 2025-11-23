@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "crates/aoclib",
+    "crates/y2024",
+]
+
+resolver = "2"
