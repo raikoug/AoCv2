@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 import sys
 
 # Rende importabile la classe GetInput dal folder python/
@@ -8,24 +9,41 @@ PYTHON_DIR = Path(__file__).resolve().parents[2]
 if str(PYTHON_DIR) not in sys.path:
     sys.path.append(str(PYTHON_DIR))
 
-from get_input import GetInput
+from get_input import GetInput  # type: ignore[import-untyped]
 
 
 GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
 
 
-def solve_1(test_string: str | None = None) -> int:
-    inputs_1 = GI.input if test_string is None else test_string
+def create_disk(start: str, length: int) -> str:
+    """Genera i dati sul disco fino a raggiungere almeno `length` bit."""
+    data = start
+    while len(data) < length:
+        b = "".join("0" if ch == "1" else "1" for ch in reversed(data))
+        data = f"{data}0{b}"
+    return data[:length]
 
-    # TODO: implementare la logica della parte 1
-    return 0
+
+def checksum(data: str) -> str:
+    """Calcola il checksum iterativo finché la lunghezza è dispari."""
+    while len(data) % 2 == 0:
+        pairs = (data[i : i + 2] for i in range(0, len(data), 2))
+        data = "".join("1" if p in ("11", "00") else "0" for p in pairs)
+    return data
 
 
-def solve_2(test_string: str | None = None) -> int:
-    inputs_1 = GI.input if test_string is None else test_string
+def solve_1(test_string: Optional[str] = None) -> str:
+    raw = GI.input if test_string is None else test_string
+    start = raw.strip()
+    disk = create_disk(start, 272)
+    return checksum(disk)
 
-    # TODO: implementare la logica della parte 2
-    return 0
+
+def solve_2(test_string: Optional[str] = None) -> str:
+    raw = GI.input if test_string is None else test_string
+    start = raw.strip()
+    disk = create_disk(start, 35651584)
+    return checksum(disk)
 
 
 if __name__ == "__main__":
