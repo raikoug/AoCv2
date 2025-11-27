@@ -16,6 +16,8 @@ class GetInput:
     Convenzione per i dati:
         ./data/{year}/day_{NN}/input_{part}.txt
     """
+    input: str
+    input_lines: list
 
     def __init__(
         self,
@@ -90,3 +92,5 @@ class GetInput:
 
         # Contenuto effettivo dell'input
         self.input: str = self.path.read_text(encoding="utf-8")
+        self.input_list : list = self.input.splitlines()
+
