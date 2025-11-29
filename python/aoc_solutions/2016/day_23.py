@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 from typing import Optional, List, Dict
+from math import factorial
 
 # Rende importabile la classe GetInput dal folder python/
 PYTHON_DIR = Path(__file__).resolve().parents[2]
@@ -15,11 +16,11 @@ from get_input import GetInput  # type: ignore[import-untyped]
 GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
 
 ## info
-##    cpy x y copies x (either an integer or the value of a register) into register y.
-##    inc x increases the value of register x by one.
-##    dec x decreases the value of register x by one.
-##    jnz x y jumps to an instruction y away (positive means forward; negative means backward), but only if x is not zero.
-##    tgl x toggles the instruction x away (pointing at instructions like jnz does: positive means forward; negative means backward):
+##    cpy x y   copies x (either an integer or the value of a register) into register y.
+##    inc x     increases the value of register x by one.
+##    dec x     decreases the value of register x by one.
+##    jnz x y   jumps to an instruction y away (positive means forward; negative means backward), but only if x is not zero.
+##    tgl x     toggles the instruction x away (pointing at instructions like jnz does: positive means forward; negative means backward):
 
 #          For one-argument instructions, inc becomes dec, and all other one-argument instructions become inc.
 #          For two-argument instructions, jnz becomes cpy, and all other two-instructions become jnz.
@@ -29,9 +30,9 @@ GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
 #          If tgl toggles itself (for example, if a is 0, tgl a would target itself and become inc a), the resulting instruction is not executed until the next time it is reached.
 
 
-def _run_program(instructions: List[str], initial_c: int) -> Dict[str, int]:
+def _run_program(instructions: List[str], initial_eggs: int) -> Dict[str, int]:
     """Esegue il linguaggio Assembunny e restituisce i registri finali."""
-    regs: Dict[str, int] = {"a": 0, "b": 0, "c": initial_c, "d": 0}
+    regs: Dict[str, int] = {"a": initial_eggs, "b": 0, "c" : 0, "d": 0}
     ip = 0
     n = len(instructions)
 
@@ -54,10 +55,40 @@ def _run_program(instructions: List[str], initial_c: int) -> Dict[str, int]:
             ip += 1
         elif op == "jnz":
             x, offset = parts[1], parts[2]
+            offset = _value(offset)
             if _value(x) != 0:
                 ip += int(offset)
             else:
                 ip += 1
+        elif op == "tgl":
+            ip_tochange = ip + regs[parts[1]]
+
+            try:
+                actual_instruction = instructions[ip_tochange]
+            except:
+                pass
+            else:
+                parts = actual_instruction.split()
+                actual_op = parts[0]
+                new_op = "_"
+                if actual_op == "inc":
+                    new_op = f"dec {parts[1]}"
+                elif actual_op == "dec":
+                    new_op = f"inc {parts[1]}"
+                elif actual_op == "tgl":
+                    new_op = f"inc {parts[1]}"
+                elif actual_op == "jnz":
+                    new_op = f"cpy {parts[1]} {parts[2]}"
+                elif actual_op == "cpy":
+                    new_op = f"jnz {parts[1]} {parts[2]}"
+                else:
+                    print(f"mi sono dimenticato di: {actual_op}")
+                    exit(1)
+                
+                instructions[ip_tochange] = new_op
+            finally:
+                ip += 1
+
         else:
             raise ValueError(f"Istruzione sconosciuta: {op!r}")
 
@@ -66,17 +97,34 @@ def _run_program(instructions: List[str], initial_c: int) -> Dict[str, int]:
 
 def solve_1(test_string: Optional[str] = None) -> int:
     raw = GI.input if test_string is None else test_string
-    # TODO: implementare la logica della parte 1 (assembunny / esecuzione istruzioni)
-    # Usa `raw.splitlines()` per ottenere le istruzioni.
-    return 0
+    
+    instructions: List[str] = raw.splitlines()
+    initial_eggs: int = 7
+    regs = _run_program(instructions, initial_eggs)
+    
+    return regs["a"]
 
 
 def solve_2(test_string: Optional[str] = None) -> int:
     raw = GI.input if test_string is None else test_string
-    # TODO: implementare la logica della parte 2
-    return 0
+    
+    part1_result = solve_1()
+    K = part1_result - factorial(7)
+
+    initial_eggs_part2 = 12
+    return factorial(initial_eggs_part2) + K
+
+
 
 
 if __name__ == "__main__":
+    test: str = """cpy 2 a
+tgl a
+tgl a
+tgl a
+cpy 1 a
+dec a
+dec a
+"""
     print(f"Part 1: {solve_1()}")
     print(f"Part 2: {solve_2()}")
