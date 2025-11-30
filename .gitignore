@@ -57,3 +57,7 @@ debug/
 Cargo.lock
 **/*.rs.bk
 *.pdb
+
+
+# NIM
+nim/aoc_solutions/**/day_[0-9][0-9]
