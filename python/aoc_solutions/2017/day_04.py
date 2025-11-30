@@ -17,15 +17,27 @@ GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
 def solve_1(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
 
-    # TODO: implementare la logica della parte 1
-    return 0
+    res: int = 0
+
+    for line in inputs_1.splitlines():
+        words = line.split(" ")
+        if len(words) == len(set(words)):
+            res += 1
+
+    return res    
 
 
 def solve_2(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
 
-    # TODO: implementare la logica della parte 2
-    return 0
+    res: int = 0
+
+    for line in inputs_1.splitlines():
+        words = ["".join(sorted(word)) for word in line.split(" ")]
+        if len(words) == len(set(words)):
+            res += 1
+
+    return res  
 
 
 if __name__ == "__main__":
