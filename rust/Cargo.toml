@@ -3,6 +3,7 @@ members = [
     "crates/aoclib",
     "crates/y2024",
     "crates/y2025",
+    "crates/y2017",
 ]
 
 resolver = "2"
