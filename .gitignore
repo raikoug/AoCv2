@@ -61,3 +61,4 @@ Cargo.lock
 
 # NIM
 nim/aoc_solutions/**/day_[0-9][0-9]
+nim/aoc_solutions/**/day_[0-9][0-9].exe
