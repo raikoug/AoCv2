@@ -56,6 +56,5 @@ proc part2*(input: string): int =
 
 when isMainModule:
   let input = readInput(Year, Day)
-  let test = "0 2 7 0"
   echo "Part 1: ", part1(input)
   echo "Part 2: ", part2(input)
