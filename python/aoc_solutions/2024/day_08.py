@@ -15,7 +15,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput  # type: ignore[import-untyped]
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 
 # --- Modello dati ---------------------------------------------------------
@@ -172,8 +172,8 @@ class Antennas(Dict[str, Antenna]):
 
 def _count_antinodes(inputs: str, use_v2: bool) -> int:
     rows = inputs.splitlines()
-    if not rows:
-        return 0
+    if not rows:    
+    return 0
 
     max_row = len(rows) - 1
     max_col = len(rows[0]) - 1

@@ -14,7 +14,7 @@ from get_input import GetInput  # type: ignore[import-untyped]
 
 CURRENT_YEAR = 2015
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 CURRENT_DAY = int(Path(__file__).stem.replace("day_", ""))
 

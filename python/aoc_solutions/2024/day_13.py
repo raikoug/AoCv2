@@ -16,7 +16,7 @@ from get_input import GetInput  # type: ignore[import-untyped]
 import re
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 OFFSET_PART2 = 10_000_000_000_000
 

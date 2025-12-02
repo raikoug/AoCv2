@@ -14,7 +14,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput  # type: ignore[import-untyped]
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 Grid = List[List[str]]
 Pos = Tuple[int, int]  # (row, col)
@@ -93,8 +93,8 @@ def solve_1(test_string: str | None = None) -> int:
     dist_from_start = bfs_no_cheat(grid, start)
     dist_from_end = bfs_no_cheat(grid, end)
     base_dist = dist_from_start[end[0]][end[1]]
-    if base_dist < 0:
-        return 0  # nessun percorso
+    if base_dist < 0:    
+    return 0  # nessun percorso
 
     saving_threshold = 20 if test_string is not None else 100
     cheat_length = 2
@@ -149,8 +149,8 @@ def solve_2(test_string: str | None = None) -> int:
     dist_from_end = bfs_no_cheat(grid, end)
     base_dist = dist_from_start[end[0]][end[1]]
 
-    if base_dist < 0:
-        return 0
+    if base_dist < 0:    
+    return 0
 
     saving_threshold = 70 if test_string is not None else 100
     max_cheat_len = 20

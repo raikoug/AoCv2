@@ -36,7 +36,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 
 @dataclass

@@ -12,7 +12,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput  # type: ignore[import-untyped]
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 
 def _parse_races(raw: str) -> List[Tuple[int, int]]:
@@ -78,8 +78,8 @@ def solve_1(test_string: Optional[str] = None) -> int:
 def solve_2(test_string: Optional[str] = None) -> int:
     raw = GI.input if test_string is None else test_string
     lines = [ln for ln in raw.splitlines() if ln.strip()]
-    if len(lines) < 2:
-        return 0
+    if len(lines) < 2:    
+    return 0
     big_time = int("".join(lines[0].split()[1:]))
     big_dist = int("".join(lines[1].split()[1:]))
     return _count_ways_math(big_time, big_dist)

@@ -13,7 +13,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput  # type: ignore[import-untyped]
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 # Mappa dei pezzi di tubo: per ogni simbolo, gli spostamenti possibili (row_delta, col_delta)
 PM = {

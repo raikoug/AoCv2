@@ -13,7 +13,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 ## info
 ##    cpy x y   copies x (either an integer or the value of a register) into register y.
 ##    inc x     increases the value of register x by one.

@@ -12,7 +12,7 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput  # type: ignore[import-untyped]
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 
 def _run_program(instructions: List[str], initial_c: int) -> Dict[str, int]:

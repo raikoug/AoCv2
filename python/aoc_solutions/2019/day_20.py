@@ -11,20 +11,19 @@ if str(PYTHON_DIR) not in sys.path:
 from get_input import GetInput
 
 
-GI = GetInput()  # se serve, possiamo passare parametri (part, year, day, ...)
+GI = GetInput()
 
 
 def solve_1(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
-
-    # TODO: implementare la logica della parte 1
+    
     return 0
 
 
 def solve_2(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
 
-    # TODO: implementare la logica della parte 2
+    
     return 0
 
 
