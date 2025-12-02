@@ -28,7 +28,6 @@ class RouteFrame(TypedDict):
 BfsFromStart = dict[int, PathInfo]
 AllBfsResults = dict[int, tuple[BfsFromStart, list["Point"]]]
 
-# Rende importabile la classe GetInput dal folder python/
 PYTHON_DIR = Path(__file__).resolve().parents[2]
 if str(PYTHON_DIR) not in sys.path:
     sys.path.append(str(PYTHON_DIR))

@@ -6,7 +6,6 @@ import re
 import string
 import sys
 
-# Rende importabile la classe GetInput dal folder python/
 PYTHON_DIR = Path(__file__).resolve().parents[2]
 if str(PYTHON_DIR) not in sys.path:
     sys.path.append(str(PYTHON_DIR))
