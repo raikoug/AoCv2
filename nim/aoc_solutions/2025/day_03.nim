@@ -1,21 +1,39 @@
 import std/strutils
 import aoclib/aoc_input
+import sequtils
 
 const
   Year* = 2025
   Day*  = 3
 
-proc part1*(input: string): string =
+proc both_parts*(input: string, length: int): int =
+  var res: int = 0
+  for line in input.strip().splitLines():
+    let numbers: seq[int] = line.mapIt(parseInt($it))
+    let n = len(numbers)
+    var start = 0
+    var remaining = length
+    var meta = 0
 
-  discard
-  result = ""
+    while remaining > 0:
+      let stop = n - remaining
+      let window = numbers[start..stop]
 
-proc part2*(input: string): string =
+      let best = window.max()
+      let local_idx = window.maxIndex()
+      let idx = start + local_idx
+      
+      start = idx + 1
+      remaining -= 1
 
-  discard
-  result = ""
+      meta = meta * 10 + best
+
+    res += meta
+
+  res
+
 
 when isMainModule:
   let input = readInput(Year, Day)
-  echo "Part 1: ", part1(input)
-  echo "Part 2: ", part2(input)
+  echo "Part 1: ", both_parts(input,2)
+  echo "Part 2: ", both_parts(input,12)
