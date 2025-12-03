@@ -85,6 +85,6 @@ ugml (68) -> gyxo, ebii, jptl
 gyxo (61)
 cntj (57)
 """
-    D, name = solve_1(test)
+    D, name = solve_1()
     print(f"Part 1: {name}")
     print(f"Part 2: {solve_2(D, name)}")
