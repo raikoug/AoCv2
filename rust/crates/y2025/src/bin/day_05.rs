@@ -1,4 +1,4 @@
-use std::ops::{Range, RangeInclusive};
+use std::ops::RangeInclusive;
 
 use aoclib::read_input;
 
@@ -45,8 +45,40 @@ fn part1(_input: &str) -> i64 {
 }
 
 fn part2(_input: &str) -> i64 {
-    // TODO: implementa la logica della parte 2
-    0
+    let mut ranges: Vec<(i64, i64)> = Vec::new();
+
+    for line in _input.trim().lines(){
+        if line.is_empty(){
+            break;
+        }
+        else{
+            let (a, b) = line.split_once('-').unwrap();
+            let start = a.parse::<i64>().unwrap();
+            let end   = b.parse::<i64>().unwrap();
+            ranges.push((start, end));
+
+        }
+    }
+    ranges.sort_unstable_by_key(|&(start, _)| start);
+
+    let (mut cur_start, mut cur_end) = ranges[0];
+    let mut total: i64 = 0;
+
+    for (s, e) in ranges.into_iter().skip(1) {
+        if s > cur_end + 1 {
+            total += cur_end - cur_start + 1;
+            cur_start = s;
+            cur_end = e;
+        } else {
+            if e > cur_end {
+                cur_end = e;
+            }
+        }
+    }
+    total += cur_end - cur_start + 1;
+
+    total
+
 }
 
 fn main() {
