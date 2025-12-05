@@ -42,10 +42,13 @@ def solve_1(test_string: str | None = None) -> int:
             res += 1
     return res
 
-def is_included(r: tuple[int,int], ranges: list[tuple[int,int]]):
-    # check if r in included in all reanges
+def is_included(a: tuple[int,int], b: tuple[int,int]):
+    a0, a1 = a[0], a[1] # i limiti del range da Checkare
+    b0, b1 = b[0], b[1] # i limite del range verso cui Checkare
 
-    pass
+    if a0 >= b0 and a1 <= b1:
+        return True
+    return False
 
 def solve_2(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
@@ -62,22 +65,22 @@ def solve_2(test_string: str | None = None) -> int:
             break
     
     ranges.sort(key= lambda p: p[0])
-    for r in ranges:
-        print(r)
+    
     res = 0    
-    last_id = 0
+    last_max = 0
     for lower,upper in ranges:
-        if lower <= last_id:
-            lower = last_id + 1
+        if upper <= last_max:
+            continue
         
-        res += (upper - lower) + 1
-        last_id = upper
-      
+        if lower <= last_max:
+            lower = last_max + 1
         
-    
-    
-    return res
+        res += upper - lower + 1
 
+        last_max = upper
+
+
+    return res
 
 if __name__ == "__main__":
     test = """3-5
@@ -92,6 +95,8 @@ if __name__ == "__main__":
 17
 32"""
     test2 = """1-100
-2-20"""
+2-20
+80-110
+85-111"""
     print(f"Part 1: {solve_1()}")
     print(f"Part 2: {solve_2()}")
