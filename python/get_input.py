@@ -50,8 +50,9 @@ class GetInput:
         if day is None:
             stem = caller_file.stem  # es. "day_01"
             prefix = "day_"
+            suffix = "_not_mine"
             if stem.startswith(prefix):
-                num_str = stem[len(prefix) :]
+                num_str = stem[len(prefix) :].replace(suffix, "")
                 try:
                     day = int(num_str)
                 except ValueError as exc:
