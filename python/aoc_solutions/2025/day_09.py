@@ -9,8 +9,6 @@ if str(PYTHON_DIR) not in sys.path:
 
 from get_input import GetInput
 from typing import TypeAlias, Sequence, Callable
-from collections import deque
-from multiprocessing import Pool, cpu_count
 
 
 GI = GetInput()
