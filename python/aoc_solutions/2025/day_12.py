@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import re
 import sys
-from typing import Callable, Final, TypeAlias
+from typing import Callable, ClassVar, Final, TypeAlias
 
 
 PYTHON_DIR = Path(__file__).resolve().parents[2]
@@ -26,6 +26,9 @@ CountsByShape: TypeAlias = dict[int, int]
 
 AreaFn: TypeAlias = Callable[[int, int], int]
 area: AreaFn = lambda w, h: w * h
+
+ToIntFn: TypeAlias = Callable[[str], int]
+to_int: ToIntFn = lambda s: int(s)
 
 
 # -----------------------------
@@ -107,17 +110,107 @@ class ParsedInput:
 
 
 # -----------------------------
+# Symmetries (point 2)
+# -----------------------------
+@dataclass(frozen=True, slots=True)
+class Footprint:
+    cells: Cells
+    width: int
+    height: int
+
+
+@dataclass(frozen=True, slots=True)
+class ShapeVariant:
+    shape_id: int
+    variant_index: int
+    cells: Cells
+    width: int
+    height: int
+
+    @property
+    def filled_area(self) -> int:
+        return len(self.cells)
+
+
+@dataclass(frozen=True, slots=True)
+class SymmetryGenerator:
+    """
+    Generates unique orientations (rotations + flips) for a shape.
+
+    We generate the 8 dihedral transforms by:
+      - 4 rotations of the original
+      - 4 rotations of the horizontally-flipped original
+    Then we normalize + dedup by cell set.
+    """
+
+    def unique_variants(self, shape: Shape) -> tuple[ShapeVariant, ...]:
+        base = Footprint(cells=shape.cells, width=shape.width, height=shape.height)
+
+        # "normalize" is cheap and keeps everything robust
+        fp0 = self._normalize(base)
+        fp1 = self._normalize(self._flip_x(fp0))
+
+        seen: set[Cells] = set()
+        variants: list[ShapeVariant] = []
+        idx = 0
+
+        for start in (fp0, fp1):
+            cur = start
+            for _ in range(4):
+                norm = self._normalize(cur)
+                if norm.cells not in seen:
+                    seen.add(norm.cells)
+                    variants.append(
+                        ShapeVariant(
+                            shape_id=shape.shape_id,
+                            variant_index=idx,
+                            cells=norm.cells,
+                            width=norm.width,
+                            height=norm.height,
+                        )
+                    )
+                    idx += 1
+                cur = self._rotate90_cw(cur)
+
+        return tuple(variants)
+
+    # ----- transforms -----
+
+    def _rotate90_cw(self, fp: Footprint) -> Footprint:
+        # (x, y) -> (y, (w-1)-x), new_w = h, new_h = w
+        w = fp.width
+        new_cells = frozenset((y, (w - 1) - x) for (x, y) in fp.cells)
+        return Footprint(cells=new_cells, width=fp.height, height=fp.width)
+
+    def _flip_x(self, fp: Footprint) -> Footprint:
+        # mirror horizontally: (x, y) -> ((w-1)-x, y)
+        w = fp.width
+        new_cells = frozenset(((w - 1) - x, y) for (x, y) in fp.cells)
+        return Footprint(cells=new_cells, width=fp.width, height=fp.height)
+
+    def _normalize(self, fp: Footprint) -> Footprint:
+        # translate so min x,y become 0,0 and recompute bounding box
+        if not fp.cells:
+            raise ValueError("Cannot normalize an empty footprint.")
+
+        min_x = min(x for (x, _) in fp.cells)
+        min_y = min(y for (_, y) in fp.cells)
+
+        shifted = frozenset((x - min_x, y - min_y) for (x, y) in fp.cells)
+
+        max_x = max(x for (x, _) in shifted)
+        max_y = max(y for (_, y) in shifted)
+
+        return Footprint(cells=shifted, width=max_x + 1, height=max_y + 1)
+
+
+# -----------------------------
 # Parsing
 # -----------------------------
 @dataclass(frozen=True, slots=True)
 class InputParser:
-    # e.g. "0:" or "12:"
-    SHAPE_HEADER_RE: Final[re.Pattern[str]] = re.compile(r"^\s*(\d+)\s*:\s*$")
-    # e.g. "12x5: 1 0 1 0 2 2"
-    REGION_RE: Final[re.Pattern[str]] = re.compile(r"^\s*(\d+)\s*x\s*(\d+)\s*:\s*(.*)\s*$")
-
-    IntFn: TypeAlias = Callable[[str], int]
-    to_int: IntFn = lambda s: int(s)
+    SHAPE_HEADER_RE: ClassVar[re.Pattern[str]] = re.compile(r"^\s*(\d+)\s*:\s*$")
+    REGION_RE: ClassVar[re.Pattern[str]] = re.compile(r"^\s*(\d+)\s*x\s*(\d+)\s*:\s*(.*)\s*$")
 
     def parse(self, raw: str) -> ParsedInput:
         lines = self._split_keep_blanks(raw)
@@ -131,13 +224,11 @@ class InputParser:
             raise ValueError("No shapes found in input.")
 
         shape_order = tuple(sorted(shapes.keys()))
-
         regions = self._parse_regions(region_lines, shape_order)
 
         return ParsedInput(shapes=shapes, shape_order=shape_order, regions=regions)
 
     def _split_keep_blanks(self, raw: str) -> list[str]:
-        # keep blank lines because they delimit shapes
         return raw.strip("\n").splitlines()
 
     def _find_first_region_line(self, lines: list[str]) -> int:
@@ -164,7 +255,7 @@ class InputParser:
             if m is None:
                 raise ValueError(f"Expected shape header like 'N:' but got: {lines[i]!r}")
 
-            shape_id = self.to_int(m.group(1))
+            shape_id = to_int(m.group(1))
             if shape_id in shapes:
                 raise ValueError(f"Duplicate shape id: {shape_id}")
 
@@ -176,7 +267,6 @@ class InputParser:
 
             shapes[shape_id] = Shape.from_grid(shape_id, rows)
 
-            # skip blank separator(s)
             while i < n and lines[i].strip() == "":
                 i += 1
 
@@ -195,8 +285,8 @@ class InputParser:
             if m is None:
                 raise ValueError(f"Invalid region line: {raw_ln!r}")
 
-            w = self.to_int(m.group(1))
-            h = self.to_int(m.group(2))
+            w = to_int(m.group(1))
+            h = to_int(m.group(2))
             rest = m.group(3).strip()
 
             if w <= 0 or h <= 0:
@@ -211,7 +301,7 @@ class InputParser:
 
             required: CountsByShape = {}
             for shape_id, qty_s in zip(shape_order, qty_parts, strict=True):
-                qty = self.to_int(qty_s)
+                qty = to_int(qty_s)
                 if qty < 0:
                     raise ValueError(f"Negative quantity is not allowed: {raw_ln!r}")
                 if qty > 0:
@@ -231,9 +321,15 @@ def solve_1(test_string: str | None = None) -> int:
     parser = InputParser()
     parsed = parser.parse(inputs_1)
 
-    # TODO: plug the actual packing solver.
-    # For now we just ensure parsing works without exploding.
-    _ = (parsed.shapes, parsed.shape_order, parsed.regions)
+    # Point 2: build unique variants for each shape.
+    sym = SymmetryGenerator()
+    variants_by_shape: dict[int, tuple[ShapeVariant, ...]] = {
+        sid: sym.unique_variants(shape)
+        for sid, shape in parsed.shapes.items()
+    }
+
+    # TODO: Point 3 + 4 (placements + search)
+    _ = variants_by_shape
 
     return 0
 
@@ -244,9 +340,13 @@ def solve_2(test_string: str | None = None) -> int:
     parser = InputParser()
     parsed = parser.parse(inputs_1)
 
-    # TODO: Part 2 unknown yet (depends on full puzzle).
-    _ = (parsed.shapes, parsed.shape_order, parsed.regions)
+    sym = SymmetryGenerator()
+    variants_by_shape: dict[int, tuple[ShapeVariant, ...]] = {
+        sid: sym.unique_variants(shape)
+        for sid, shape in parsed.shapes.items()
+    }
 
+    _ = variants_by_shape
     return 0
 
 
