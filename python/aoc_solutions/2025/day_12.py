@@ -26,6 +26,7 @@ CountsByShape: TypeAlias = dict[int, int]
 
 Mask: TypeAlias = int
 Offset: TypeAlias = tuple[int, int]
+RegionKey: TypeAlias = tuple[int, int]
 
 AreaFn: TypeAlias = Callable[[int, int], int]
 area: AreaFn = lambda w, h: w * h
@@ -222,11 +223,12 @@ class GridIndexer:
 
 @dataclass(frozen=True, slots=True)
 class Placement:
+    placement_id: int  # stable per shape, used to avoid permutations of identical pieces
     shape_id: int
     variant_index: int
     offset: Offset  # (dx, dy)
     mask: Mask
-    filled_area: int  # quick access for heuristics / debugging
+    filled_area: int  # quick access
 
 
 @dataclass(frozen=True, slots=True)
@@ -249,13 +251,21 @@ class PlacementGenerator:
         out: dict[int, tuple[Placement, ...]] = {}
         for shape_id, variants in variants_by_shape.items():
             all_placements: list[Placement] = []
+            placement_id = 0
             for variant in variants:
-                all_placements.extend(self._placements_for_variant(indexer, variant))
+                for p in self._placements_for_variant(indexer, variant, placement_id_start=placement_id):
+                    all_placements.append(p)
+                placement_id = len(all_placements)
             out[shape_id] = tuple(all_placements)
 
         return out
 
-    def _placements_for_variant(self, indexer: GridIndexer, variant: ShapeVariant) -> list[Placement]:
+    def _placements_for_variant(
+        self,
+        indexer: GridIndexer,
+        variant: ShapeVariant,
+        placement_id_start: int,
+    ) -> list[Placement]:
         W = indexer.width
         H = indexer.height
 
@@ -266,6 +276,7 @@ class PlacementGenerator:
         max_dx = W - variant.width
         max_dy = H - variant.height
 
+        pid = placement_id_start
         for dy in range(max_dy + 1):
             for dx in range(max_dx + 1):
                 mask: Mask = 0
@@ -275,6 +286,7 @@ class PlacementGenerator:
 
                 placements.append(
                     Placement(
+                        placement_id=pid,
                         shape_id=variant.shape_id,
                         variant_index=variant.variant_index,
                         offset=(dx, dy),
@@ -282,8 +294,153 @@ class PlacementGenerator:
                         filled_area=variant.filled_area,
                     )
                 )
+                pid += 1
 
         return placements
+
+
+# -----------------------------
+# Solver (point 4)
+# -----------------------------
+@dataclass(frozen=True, slots=True)
+class PackingSolver:
+    """
+    Decides if a region can fit all required presents.
+
+    Core idea:
+      - each placement is a bitmask of occupied cells
+      - overlap test is (used & placement.mask) != 0
+      - MRV heuristic: pick next shape with the fewest feasible placements
+      - pruning: remaining_area <= free_cells
+      - avoid permutations for identical shapes using placement_id monotonic constraint
+    """
+
+    def can_fit(
+        self,
+        region: RegionSpec,
+        required: CountsByShape,
+        shapes: dict[int, Shape],
+        placements_by_shape: dict[int, tuple[Placement, ...]],
+    ) -> bool:
+        region_area = region.region_area
+
+        shape_area: dict[int, int] = {sid: s.filled_area for sid, s in shapes.items()}
+
+        remaining_counts: dict[int, int] = dict(required)
+        remaining_area = self._required_area(remaining_counts, shape_area)
+
+        # quick impossible checks
+        if remaining_area > region_area:
+            return False
+
+        for sid, qty in remaining_counts.items():
+            if qty <= 0:
+                continue
+            if sid not in placements_by_shape:
+                return False
+            if len(placements_by_shape[sid]) == 0:
+                return False
+
+        min_pid_by_shape: dict[int, int] = {}
+        used: Mask = 0
+
+        return self._dfs(
+            used=used,
+            remaining_counts=remaining_counts,
+            remaining_area=remaining_area,
+            region_area=region_area,
+            placements_by_shape=placements_by_shape,
+            shape_area=shape_area,
+            min_pid_by_shape=min_pid_by_shape,
+        )
+
+    def _required_area(self, counts: dict[int, int], shape_area: dict[int, int]) -> int:
+        total = 0
+        for sid, qty in counts.items():
+            if qty > 0:
+                total += qty * shape_area[sid]
+        return total
+
+    def _dfs(
+        self,
+        used: Mask,
+        remaining_counts: dict[int, int],
+        remaining_area: int,
+        region_area: int,
+        placements_by_shape: dict[int, tuple[Placement, ...]],
+        shape_area: dict[int, int],
+        min_pid_by_shape: dict[int, int],
+    ) -> bool:
+        if remaining_area == 0:
+            return True
+
+        free_cells = region_area - used.bit_count()
+        if remaining_area > free_cells:
+            return False
+
+        # MRV: choose the next shape with the fewest feasible placements
+        chosen_sid: int | None = None
+        chosen_candidates: list[Placement] = []
+        best_n: int | None = None
+
+        for sid, qty in remaining_counts.items():
+            if qty <= 0:
+                continue
+
+            min_pid = min_pid_by_shape.get(sid, 0)
+            candidates: list[Placement] = []
+            for p in placements_by_shape[sid]:
+                if p.placement_id < min_pid:
+                    continue
+                if (used & p.mask) == 0:
+                    candidates.append(p)
+
+            n = len(candidates)
+            if n == 0:
+                return False
+
+            if best_n is None or n < best_n:
+                best_n = n
+                chosen_sid = sid
+                chosen_candidates = candidates
+
+                # can't do better than 1
+                if best_n == 1:
+                    break
+
+        if chosen_sid is None:
+            return False
+
+        sid = chosen_sid
+        old_qty = remaining_counts[sid]
+
+        old_min_pid_present = sid in min_pid_by_shape
+        old_min_pid = min_pid_by_shape.get(sid, 0)
+
+        # try each feasible placement
+        for p in chosen_candidates:
+            remaining_counts[sid] = old_qty - 1
+            min_pid_by_shape[sid] = p.placement_id + 1
+
+            if self._dfs(
+                used=used | p.mask,
+                remaining_counts=remaining_counts,
+                remaining_area=remaining_area - shape_area[sid],
+                region_area=region_area,
+                placements_by_shape=placements_by_shape,
+                shape_area=shape_area,
+                min_pid_by_shape=min_pid_by_shape,
+            ):
+                return True
+
+            # restore for next candidate
+            remaining_counts[sid] = old_qty
+            if old_min_pid_present:
+                min_pid_by_shape[sid] = old_min_pid
+            else:
+                del min_pid_by_shape[sid]
+
+        return False
 
 
 # -----------------------------
@@ -395,50 +552,85 @@ class InputParser:
 
 
 # -----------------------------
-# Solutions (placeholder for now)
+# Solutions
 # -----------------------------
 def solve_1(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
 
-    parser = InputParser()
-    parsed = parser.parse(inputs_1)
+    parsed = InputParser().parse(inputs_1)
 
-    # point 2
     sym = SymmetryGenerator()
     variants_by_shape: dict[int, tuple[ShapeVariant, ...]] = {
         sid: sym.unique_variants(shape)
         for sid, shape in parsed.shapes.items()
     }
 
-    # point 3 (generate placements per region)
     pg = PlacementGenerator()
-    for region in parsed.regions:
-        placements = pg.placements_by_shape(region, variants_by_shape)
-        _ = placements  # TODO: feed into solver (point 4)
+    solver = PackingSolver()
 
-    return 0
+    placements_cache: dict[RegionKey, dict[int, tuple[Placement, ...]]] = {}
+
+    fittable = 0
+    for region in parsed.regions:
+        key: RegionKey = (region.width, region.height)
+
+        if key not in placements_cache:
+            # placements depend only on region size + shape variants
+            placements_cache[key] = pg.placements_by_shape(region, variants_by_shape)
+
+        placements_by_shape = placements_cache[key]
+
+        if solver.can_fit(
+            region=region,
+            required=region.required,
+            shapes=parsed.shapes,
+            placements_by_shape=placements_by_shape,
+        ):
+            fittable += 1
+
+    return fittable
 
 
 def solve_2(test_string: str | None = None) -> int:
     inputs_1 = GI.input if test_string is None else test_string
-
-    parser = InputParser()
-    parsed = parser.parse(inputs_1)
-
-    sym = SymmetryGenerator()
-    variants_by_shape: dict[int, tuple[ShapeVariant, ...]] = {
-        sid: sym.unique_variants(shape)
-        for sid, shape in parsed.shapes.items()
-    }
-
-    pg = PlacementGenerator()
-    for region in parsed.regions:
-        placements = pg.placements_by_shape(region, variants_by_shape)
-        _ = placements
-
+    _ = inputs_1
+    # Part 2 not specified in prompt excerpt
     return 0
 
 
 if __name__ == "__main__":
-    print(f"Part 1: {solve_1()}")
+    test = """0:
+###
+##.
+##.
+
+1:
+###
+##.
+.##
+
+2:
+.##
+###
+##.
+
+3:
+##.
+###
+##.
+
+4:
+###
+#..
+###
+
+5:
+###
+.#.
+###
+
+4x4: 0 0 0 0 2 0
+12x5: 1 0 1 0 2 2
+12x5: 1 0 1 0 3 2"""
+    print(f"Part 1: {solve_1(test)}")
     print(f"Part 2: {solve_2()}")
