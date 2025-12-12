@@ -24,11 +24,17 @@ Grid: TypeAlias = tuple[str, ...]
 Cells: TypeAlias = frozenset[Coord]
 CountsByShape: TypeAlias = dict[int, int]
 
+Mask: TypeAlias = int
+Offset: TypeAlias = tuple[int, int]
+
 AreaFn: TypeAlias = Callable[[int, int], int]
 area: AreaFn = lambda w, h: w * h
 
 ToIntFn: TypeAlias = Callable[[str], int]
 to_int: ToIntFn = lambda s: int(s)
+
+SetBitFn: TypeAlias = Callable[[Mask, int], Mask]
+set_bit: SetBitFn = lambda mask, idx: mask | (1 << idx)
 
 
 # -----------------------------
@@ -146,7 +152,6 @@ class SymmetryGenerator:
     def unique_variants(self, shape: Shape) -> tuple[ShapeVariant, ...]:
         base = Footprint(cells=shape.cells, width=shape.width, height=shape.height)
 
-        # "normalize" is cheap and keeps everything robust
         fp0 = self._normalize(base)
         fp1 = self._normalize(self._flip_x(fp0))
 
@@ -174,22 +179,17 @@ class SymmetryGenerator:
 
         return tuple(variants)
 
-    # ----- transforms -----
-
     def _rotate90_cw(self, fp: Footprint) -> Footprint:
-        # (x, y) -> (y, (w-1)-x), new_w = h, new_h = w
         w = fp.width
         new_cells = frozenset((y, (w - 1) - x) for (x, y) in fp.cells)
         return Footprint(cells=new_cells, width=fp.height, height=fp.width)
 
     def _flip_x(self, fp: Footprint) -> Footprint:
-        # mirror horizontally: (x, y) -> ((w-1)-x, y)
         w = fp.width
         new_cells = frozenset(((w - 1) - x, y) for (x, y) in fp.cells)
         return Footprint(cells=new_cells, width=fp.width, height=fp.height)
 
     def _normalize(self, fp: Footprint) -> Footprint:
-        # translate so min x,y become 0,0 and recompute bounding box
         if not fp.cells:
             raise ValueError("Cannot normalize an empty footprint.")
 
@@ -202,6 +202,88 @@ class SymmetryGenerator:
         max_y = max(y for (_, y) in shifted)
 
         return Footprint(cells=shifted, width=max_x + 1, height=max_y + 1)
+
+
+# -----------------------------
+# Placements (point 3)
+# -----------------------------
+@dataclass(frozen=True, slots=True)
+class GridIndexer:
+    width: int
+    height: int
+
+    def index_of(self, coord: Coord) -> int:
+        x, y = coord
+        return y * self.width + x
+
+    def bit_of(self, coord: Coord) -> Mask:
+        return 1 << self.index_of(coord)
+
+
+@dataclass(frozen=True, slots=True)
+class Placement:
+    shape_id: int
+    variant_index: int
+    offset: Offset  # (dx, dy)
+    mask: Mask
+    filled_area: int  # quick access for heuristics / debugging
+
+
+@dataclass(frozen=True, slots=True)
+class PlacementGenerator:
+    """
+    For a given Region (W x H), generates all valid placements for each shape,
+    considering all unique variants (rotations/flips).
+
+    Each placement is represented as a bitmask (Python int).
+    Bit index: idx = y*W + x
+    """
+
+    def placements_by_shape(
+        self,
+        region: RegionSpec,
+        variants_by_shape: dict[int, tuple[ShapeVariant, ...]],
+    ) -> dict[int, tuple[Placement, ...]]:
+        indexer = GridIndexer(width=region.width, height=region.height)
+
+        out: dict[int, tuple[Placement, ...]] = {}
+        for shape_id, variants in variants_by_shape.items():
+            all_placements: list[Placement] = []
+            for variant in variants:
+                all_placements.extend(self._placements_for_variant(indexer, variant))
+            out[shape_id] = tuple(all_placements)
+
+        return out
+
+    def _placements_for_variant(self, indexer: GridIndexer, variant: ShapeVariant) -> list[Placement]:
+        W = indexer.width
+        H = indexer.height
+
+        if variant.width > W or variant.height > H:
+            return []
+
+        placements: list[Placement] = []
+        max_dx = W - variant.width
+        max_dy = H - variant.height
+
+        for dy in range(max_dy + 1):
+            for dx in range(max_dx + 1):
+                mask: Mask = 0
+                for (x, y) in variant.cells:
+                    idx = (y + dy) * W + (x + dx)
+                    mask = set_bit(mask, idx)
+
+                placements.append(
+                    Placement(
+                        shape_id=variant.shape_id,
+                        variant_index=variant.variant_index,
+                        offset=(dx, dy),
+                        mask=mask,
+                        filled_area=variant.filled_area,
+                    )
+                )
+
+        return placements
 
 
 # -----------------------------
@@ -321,15 +403,18 @@ def solve_1(test_string: str | None = None) -> int:
     parser = InputParser()
     parsed = parser.parse(inputs_1)
 
-    # Point 2: build unique variants for each shape.
+    # point 2
     sym = SymmetryGenerator()
     variants_by_shape: dict[int, tuple[ShapeVariant, ...]] = {
         sid: sym.unique_variants(shape)
         for sid, shape in parsed.shapes.items()
     }
 
-    # TODO: Point 3 + 4 (placements + search)
-    _ = variants_by_shape
+    # point 3 (generate placements per region)
+    pg = PlacementGenerator()
+    for region in parsed.regions:
+        placements = pg.placements_by_shape(region, variants_by_shape)
+        _ = placements  # TODO: feed into solver (point 4)
 
     return 0
 
@@ -346,7 +431,11 @@ def solve_2(test_string: str | None = None) -> int:
         for sid, shape in parsed.shapes.items()
     }
 
-    _ = variants_by_shape
+    pg = PlacementGenerator()
+    for region in parsed.regions:
+        placements = pg.placements_by_shape(region, variants_by_shape)
+        _ = placements
+
     return 0
 
 
